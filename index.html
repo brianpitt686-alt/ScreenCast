@@ -1,0 +1,493 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline WebRTC Screen Caster</title>
+    <style>
+        :root {
+            --bg-color: #0f111a;
+            --card-bg: #1e2130;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --secondary: #10b981;
+            --secondary-hover: #059669;
+            --accent: #f43f5e;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-radius: 16px;
+        }
+
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+
+        h1 { margin-bottom: 10px; font-size: 2.2em; letter-spacing: -0.5px; }
+        
+        .alert-box {
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #ff8a9f;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            max-width: 700px;
+            margin: 0 auto 20px auto;
+            line-height: 1.5;
+        }
+
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            width: 100%;
+            max-width: 1100px;
+            justify-content: center;
+        }
+
+
+        .panel {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            flex: 1;
+            min-width: 320px;
+            max-width: 450px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+
+        .panel h2 {
+            margin-top: 0;
+            color: var(--text-main);
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+
+        button {
+            background-color: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            font-size: 0.95em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+
+        button:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-1px); }
+        button:active:not(:disabled) { transform: translateY(1px); }
+        button:disabled { background-color: #334155; color: #64748b; cursor: not-allowed; }
+
+
+        .btn-secondary { background-color: var(--secondary); }
+        .btn-secondary:hover:not(:disabled) { background-color: var(--secondary-hover); }
+
+
+        textarea {
+            width: 100%;
+            height: 90px;
+            background-color: rgba(0,0,0,0.2);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            resize: none;
+            box-sizing: border-box;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.8em;
+            transition: border-color 0.2s;
+        }
+
+
+        textarea:focus { outline: none; border-color: var(--primary); }
+        textarea::placeholder { color: #475569; }
+
+
+        .step-label {
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+            display: block;
+            margin-top: 20px;
+        }
+
+
+        .video-container {
+            width: 100%;
+            max-width: 1100px;
+            margin-top: 40px;
+            background-color: #000;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            display: none;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+
+        video {
+            width: 100%;
+            height: auto;
+            max-height: 75vh;
+            display: block;
+        }
+
+
+        #localPreviewContainer {
+            margin-top: 20px;
+            display: none;
+        }
+
+
+        #localVideo {
+            width: 100%;
+            border-radius: 8px;
+            background: #000;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+
+        #statusMsg {
+            margin-top: 15px;
+            font-weight: 600;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status-error { background: rgba(244, 63, 94, 0.2); color: #fda4af; }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    </style>
+</head>
+<body>
+
+
+    <div class="header-section">
+        <h1>Serverless Caster</h1>
+        <div class="alert-box">
+            <strong>Note for Mobile Users:</strong> iPhones/iPads physically block screen sharing on all browsers (even Chrome). If screen sharing fails, use the <strong>Share Camera</strong> button instead to cast your phone's camera to your computer!
+        </div>
+        <div id="statusMsg"></div>
+    </div>
+
+
+    <div class="container">
+        <!-- SENDER PANEL (Phone/Device sharing screen) -->
+        <div class="panel">
+            <h2>📱 Step A: Sender (Your Phone)</h2>
+            
+            <span class="step-label">1. Choose what to cast</span>
+            <div class="button-group">
+                <button id="btnStartScreen">📺 Share Screen</button>
+                <button id="btnStartCamera" class="btn-secondary">📷 Share Camera</button>
+            </div>
+
+
+            <div id="localPreviewContainer">
+                <span class="step-label">Live Preview</span>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+
+
+            <span class="step-label">2. Send this code to receiver</span>
+            <textarea id="senderOfferCode" readonly placeholder="Start casting to generate code..."></textarea>
+            <button id="btnCopyOffer" disabled>📋 Copy Code</button>
+
+
+            <span class="step-label">3. Paste Answer from receiver</span>
+            <textarea id="senderAnswerInput" placeholder="Paste the answer code here..."></textarea>
+            <button id="btnConnectSender" class="btn-secondary" disabled>🚀 Connect Devices</button>
+        </div>
+
+
+        <!-- RECEIVER PANEL (PC/Device viewing screen) -->
+        <div class="panel">
+            <h2>💻 Step B: Receiver (Your Display)</h2>
+            
+            <span class="step-label">1. Paste Sender's Code</span>
+            <textarea id="receiverOfferInput" placeholder="Paste the code from the Sender here..."></textarea>
+            <button id="btnAcceptOffer">✅ Accept Connection</button>
+
+
+            <span class="step-label">2. Send this Answer back</span>
+            <textarea id="receiverAnswerCode" readonly placeholder="Waiting to accept offer..."></textarea>
+            <button id="btnCopyAnswer" disabled>📋 Copy Answer</button>
+        </div>
+    </div>
+
+
+    <!-- REMOTE VIDEO DISPLAY -->
+    <div class="video-container" id="videoWrapper">
+        <video id="remoteVideo" autoplay playsinline controls></video>
+    </div>
+
+
+    <script>
+        // WebRTC Configuration
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' }, 
+                { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+        };
+
+
+        let peerConnection;
+        let localStream;
+
+
+        // UI Elements
+        const btnStartScreen = document.getElementById('btnStartScreen');
+        const btnStartCamera = document.getElementById('btnStartCamera');
+        const senderOfferCode = document.getElementById('senderOfferCode');
+        const btnCopyOffer = document.getElementById('btnCopyOffer');
+        const senderAnswerInput = document.getElementById('senderAnswerInput');
+        const btnConnectSender = document.getElementById('btnConnectSender');
+
+
+        const receiverOfferInput = document.getElementById('receiverOfferInput');
+        const btnAcceptOffer = document.getElementById('btnAcceptOffer');
+        const receiverAnswerCode = document.getElementById('receiverAnswerCode');
+        const btnCopyAnswer = document.getElementById('btnCopyAnswer');
+
+
+        const localVideo = document.getElementById('localVideo');
+        const localPreviewContainer = document.getElementById('localPreviewContainer');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const videoWrapper = document.getElementById('videoWrapper');
+        const statusMsg = document.getElementById('statusMsg');
+
+
+        function showStatus(msg, isError = false) {
+            statusMsg.style.display = 'block';
+            statusMsg.innerText = msg;
+            statusMsg.className = isError ? 'status-error' : 'status-success';
+            if (isError) setTimeout(() => { statusMsg.style.display = 'none'; }, 8000);
+        }
+
+
+        function createPeerConnection() {
+            const pc = new RTCPeerConnection(configuration);
+            
+            pc.oniceconnectionstatechange = () => {
+                if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                    showStatus("Connection Established Successfully!", false);
+                } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                    showStatus("Connection lost or failed.", true);
+                }
+            };
+            return pc;
+        }
+
+
+        function waitForIceGathering(pc) {
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                } else {
+                    const checkState = () => {
+                        if (pc.iceGatheringState === 'complete') {
+                            pc.removeEventListener('icegatheringstatechange', checkState);
+                            resolve();
+                        }
+                    };
+                    pc.addEventListener('icegatheringstatechange', checkState);
+                    setTimeout(() => resolve(), 3000); // 3 second fallback timeout
+                }
+            });
+        }
+
+
+        // ==========================================
+        // MEDIA CAPTURE LOGIC
+        // ==========================================
+        async function startMedia(type) {
+            try {
+                if (type === 'camera') {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error("Camera API not supported on this browser.");
+                    }
+                    // Request back camera if on mobile
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                } else {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                        throw new Error("Screen sharing is blocked by your browser. Chrome on iOS uses Apple's Safari engine, which forbids screen capture. Please tap 'Share Camera' instead!");
+                    }
+                    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+                }
+
+
+                // Update UI
+                btnStartScreen.disabled = true;
+                btnStartCamera.disabled = true;
+                
+                // Show local preview
+                localVideo.srcObject = localStream;
+                localPreviewContainer.style.display = 'block';
+
+
+                // Setup WebRTC
+                peerConnection = createPeerConnection();
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+
+
+                senderOfferCode.value = "Gathering network candidates... please wait.";
+                await waitForIceGathering(peerConnection);
+
+
+                // Encode offer
+                const offerData = JSON.stringify(peerConnection.localDescription);
+                senderOfferCode.value = btoa(offerData); 
+                btnCopyOffer.disabled = false;
+                btnConnectSender.disabled = false;
+                showStatus("Media captured! Copy the code in Step 2.", false);
+
+
+            } catch (err) {
+                console.error(err);
+                showStatus(err.message, true);
+            }
+        }
+
+
+        btnStartScreen.addEventListener('click', () => startMedia('screen'));
+        btnStartCamera.addEventListener('click', () => startMedia('camera'));
+
+
+        // ==========================================
+        // SENDER LOGIC (Connect via Answer)
+        // ==========================================
+        btnCopyOffer.addEventListener('click', () => {
+            navigator.clipboard.writeText(senderOfferCode.value);
+            btnCopyOffer.innerText = "✅ Copied!";
+            setTimeout(() => { btnCopyOffer.innerText = "📋 Copy Code"; }, 2000);
+        });
+
+
+        btnConnectSender.addEventListener('click', async () => {
+            try {
+                const answerInput = senderAnswerInput.value.trim();
+                if (!answerInput) return showStatus("Please paste the Answer code first.", true);
+                
+                const answerData = JSON.parse(atob(answerInput));
+                const answerDesc = new RTCSessionDescription(answerData);
+                await peerConnection.setRemoteDescription(answerDesc);
+                
+                btnConnectSender.disabled = true;
+                btnConnectSender.innerText = "Connecting...";
+            } catch (err) {
+                showStatus("Invalid Answer Code. Make sure you copied all of it.", true);
+            }
+        });
+
+
+        // ==========================================
+        // RECEIVER LOGIC
+        // ==========================================
+        btnAcceptOffer.addEventListener('click', async () => {
+            try {
+                const offerInput = receiverOfferInput.value.trim();
+                if (!offerInput) return showStatus("Please paste the Sender code first.", true);
+
+
+                peerConnection = createPeerConnection();
+
+
+                // When remote stream arrives, show it!
+                peerConnection.ontrack = (event) => {
+                    videoWrapper.style.display = 'block';
+                    remoteVideo.srcObject = event.streams[0];
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                };
+
+
+                const offerData = JSON.parse(atob(offerInput));
+                const offerDesc = new RTCSessionDescription(offerData);
+                await peerConnection.setRemoteDescription(offerDesc);
+
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+
+                receiverAnswerCode.value = "Gathering network candidates... please wait.";
+                await waitForIceGathering(peerConnection);
+
+
+                // Encode answer
+                const answerData = JSON.stringify(peerConnection.localDescription);
+                receiverAnswerCode.value = btoa(answerData);
+                btnCopyAnswer.disabled = false;
+                
+                btnAcceptOffer.disabled = true;
+                btnAcceptOffer.innerText = "Offer Accepted";
+                showStatus("Offer accepted! Copy the Answer in Step 2.", false);
+
+
+            } catch (err) {
+                showStatus("Invalid Sender Code. Make sure you copied all of it.", true);
+            }
+        });
+
+
+        btnCopyAnswer.addEventListener('click', () => {
+            navigator.clipboard.writeText(receiverAnswerCode.value);
+            btnCopyAnswer.innerText = "✅ Copied!";
+            setTimeout(() => { btnCopyAnswer.innerText = "📋 Copy Answer"; }, 2000);
+        });
+
+
+    </script>
+</body>
+</html>
